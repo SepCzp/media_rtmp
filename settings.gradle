@@ -8,3 +8,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "rtmp_media"
 include ':app'
+include ':rtmpLib'
