@@ -1,7 +1,6 @@
-package com.example.rtmplib.headshake;
+package com.example.rtmplib.handskake;
 
-
-import com.example.rtmplib.IBinary;
+import com.example.networktest.rtmp.IBinary;
 
 public class CS0 implements IBinary {
 
@@ -11,6 +10,14 @@ public class CS0 implements IBinary {
     }
 
     public CS0(byte version) {
+        this.version = version;
+    }
+
+    public byte getVersion() {
+        return version;
+    }
+
+    public void setVersion(byte version) {
         this.version = version;
     }
 
