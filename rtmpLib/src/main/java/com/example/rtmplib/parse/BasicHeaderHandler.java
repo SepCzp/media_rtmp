@@ -43,6 +43,8 @@ public class BasicHeaderHandler implements ParseHandler {
                     rtmpResponse.setChunkStreamId((bytes[1] & 0x000000FF) + 64 + ((bytes[2] & 0x000000FF) * 256));
                     rtmpResponse.setBasicHeaderByteLen(3);
                     break;
+                case 3:
+                    break;
                 default:
                     rtmpResponse.setFmt2Bit(fmt);
                     rtmpResponse.setChunkStreamId(streamType);

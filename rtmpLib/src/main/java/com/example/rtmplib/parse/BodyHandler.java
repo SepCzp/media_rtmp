@@ -19,7 +19,8 @@ public class BodyHandler implements ParseHandler {
     public RtmpResponse handle(InputStream is) {
         int bodyLen = response.getMessageLength3Bytes();
         if (bodyLen == 0) {
-            System.out.println("chunk header parse failure");
+            System.out.println(response);
+            return response;
         }
         byte[] bytes = new byte[bodyLen];
         RtmpParseHandler.read(is, bytes, 0, bodyLen);
