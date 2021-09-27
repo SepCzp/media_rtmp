@@ -1,5 +1,8 @@
 package com.example.rtmp_media.flv;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 public class FlvHelper {
 
     public static final int FLV_TAG_HEADER_LEN = 11;
@@ -28,8 +31,8 @@ public class FlvHelper {
         //version
         flvHeader[3] = 0x1;
         //5byte
-        int videoTag = isHasVideo ? 0x00000001 : 0;
-        int audioTag = isHasAudio ? 0x00000004 : 0;
+        int videoTag = isHasVideo ? 1 : 0;
+        int audioTag = isHasAudio ? 4 : 0;
         flvHeader[4] = (byte) (audioTag | videoTag);
         //data offset
         flvHeader[5] = 0;
@@ -90,6 +93,20 @@ public class FlvHelper {
         return videoFixTag;
     }
 
+    public static byte[] warpFLVBodyOfVideoTag(byte[] data, boolean isKeyFrame) {
+        int flvVideoFrameType = 2;
+        if (isKeyFrame) {
+            flvVideoFrameType = 1;
+        }
+
+        byte[] bytes = warpFLVBodyOfFixVideoTag(flvVideoFrameType, 7, (byte) 1);
+
+        ByteBuffer buffer = ByteBuffer.allocateDirect(bytes.length + data.length);
+        buffer.put(bytes);
+        buffer.put(data);
+        return buffer.array();
+    }
+
     /**
      * 三位分 00 00 01
      * 四位分 00 00 00 01
@@ -119,7 +136,7 @@ public class FlvHelper {
         byte[] videoFixData = warpFLVBodyOfFixVideoTag(flvVideoFrameType, codecID, acvPacketType);
         int fixLen = videoFixData.length;
         //
-        int len = 7 + sps.length + pps.length + fixLen;
+        int len = sps.length + pps.length + fixLen+11;
 
         byte[] tagData = new byte[len];
 
@@ -170,8 +187,7 @@ public class FlvHelper {
         int soundRate = FlvAudioRate.KHZ_44;
         int soundSize = audioSize / 8 - 1;
         int soundType = 1;
-
-        audioFix[0] = (byte) (((soundFormat & 0x0F) << 4) | ((soundRate & 0x03) << 2) | ((soundSize & 0x01) << 1) | (soundType & 0x01));
+        audioFix[0] = (byte) (((byte)(soundFormat & 0x0F) << 4) | ((byte)(soundRate & 0x03) << 2) | ((byte)(soundSize & 0x01) << 1) | (byte)(soundType & 0x01));
         //AACPacketType
         if (isFirst) {
             audioFix[1] = 0x0;

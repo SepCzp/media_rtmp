@@ -8,6 +8,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * type marker
+ * objects
+ * end object
+ */
 public class AMFObject extends AMF {
 
     protected List<ObjectProperty> properties = null;

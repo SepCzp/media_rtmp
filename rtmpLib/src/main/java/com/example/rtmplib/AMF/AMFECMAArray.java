@@ -5,6 +5,12 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+/**
+ * type marker
+ * array len
+ * items
+ * end object
+ */
 public class AMFECMAArray extends AMFObject {
 
     private int arraySize4Bytes;

@@ -26,11 +26,12 @@ public class H264Codec {
     private long frameCount = 0;
     private VideoFrameType videoFrameType = VideoFrameType.UN_KNOWN;
     private Context context;
+    private int remaining;
 
     public H264Codec(int width, int height) {
         try {
             frameCount = 0;
-            mediaFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, height, width);
+            mediaFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height);
             //接收的数据类型为yuv任何格式
             mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, width * height * 10);
@@ -85,17 +86,17 @@ public class H264Codec {
                 System.arraycopy(outBytes, 0, head, 0, outBytes.length);
                 videoFrameType = VideoFrameType.SPS_PPS;
                 //
-//                ByteBuffer spsB = mediaCodec.getOutputFormat().getByteBuffer("csd-0");
+                ByteBuffer spsB = mediaCodec.getOutputFormat().getByteBuffer("csd-0");
+                remaining = spsB.remaining();
 //                ByteBuffer ppsB = mediaCodec.getOutputFormat().getByteBuffer("csd-1");
             } else if (bufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME) {
                 //关键帧- 都要加上pps和sps  所以此处得到的是pps+sps+I帧
-                if (videoFrameType.value == VideoFrameType.SPS_PPS.value) {
+                if (videoFrameType.value == VideoFrameType.SPS_PPS.value&&head!=null) {
                     byte[] keyData = new byte[bufferInfo.size + head.length];
                     System.arraycopy(head, 0, keyData, 0, head.length);
                     System.arraycopy(outBytes, 0, keyData, head.length, outBytes.length);
                     outBytes = keyData;
                     videoFrameType = VideoFrameType.SPS_PPS_I;
-                    head = null;
                 } else {
                     videoFrameType = VideoFrameType.I;
                 }
@@ -114,32 +115,8 @@ public class H264Codec {
         Log.d(TAG, "encode take time : " + (System.currentTimeMillis() - start));
     }
 
-    private FileOutputStream mFos;
-
-    private void dumpFile(String fileName, byte[] data) {
-
-        File file = new File(context.getFilesDir(), fileName);
-        if (!file.exists()) {
-            try {
-                file.createNewFile();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        try {
-            if (mFos == null) {
-                mFos = new FileOutputStream(file);
-            }
-
-        } catch (IOException ioe) {
-            throw new RuntimeException("Unable to create output file " + fileName, ioe);
-        }
-        try {
-            mFos.write(data);
-//            mFos.close();
-        } catch (IOException ioe) {
-            throw new RuntimeException("failed writing data to file " + fileName, ioe);
-        }
+    public int getSpsLen() {
+        return remaining;
     }
 
     /**

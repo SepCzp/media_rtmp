@@ -18,7 +18,7 @@ public class H264DeCodec {
 
     public H264DeCodec(Surface surface, int w, int h) {
         try {
-            MediaFormat mediaFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, h, w);
+            MediaFormat mediaFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h);
             mediaCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
             mediaCodec.configure(mediaFormat, surface, null, 0);
             mediaCodec.start();

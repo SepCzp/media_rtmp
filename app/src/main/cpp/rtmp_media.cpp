@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <log.h>
 #include <malloc.h>
+#include <pthread.h>
+#include <mutex>
+#include <queue>
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"RTMP",__VA_ARGS__)
 
@@ -13,6 +16,7 @@
 #define HTON32(x)  ((x>>24&0xff)|(x>>8&0xff00)|\
     (x<<8&0xff0000)|(x<<24&0xff000000))
 #define HTONTIME(x) ((x>>16&0xff)|(x<<16&0xff0000)|(x&0xff00)|(x&0xff000000))
+
 
 /*read 1 byte*/
 int ReadU8(uint32_t *u8, FILE *fp) {
@@ -61,6 +65,91 @@ int ReadTime(uint32_t *utime, FILE *fp) {
     return 1;
 }
 
+RTMP *rtmp1 = nullptr;
+bool isConnect = false;
+pthread_mutex_t mutex;
+std::queue<RTMPPacket *> packets;
+pthread_t push_thr;
+uint32_t start_time = 0;
+
+
+void *onPush(void *args) {
+    RTMPPacket *packet = 0;
+    while (true) {
+
+        if (packets.empty()) {
+            continue;
+        }
+        packet = packets.front();
+        packets.pop();
+
+        packet->m_nInfoField2 = rtmp1->m_stream_id;
+        packet->m_nTimeStamp = RTMP_GetTime() - start_time;
+        int ret = RTMP_SendPacket(rtmp1, packet, 1);
+        if (!ret) {
+            LOGE("发送失败");
+            break;
+        } else {
+            RTMPPacket_Free(packet);
+            LOGE("发送成功");
+        }
+    }
+
+    if (packet) {
+        RTMPPacket_Free(packet);
+        delete packet;
+        packet = 0;
+    }
+
+    if (rtmp1) {
+        RTMP_DeleteStream(rtmp1);
+        RTMP_Close(rtmp1);
+        RTMP_Free(rtmp1);
+        rtmp1 = 0;
+        LOGE("释放 native 资源");
+    }
+    return nullptr;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_rtmp_1media_RtmpNative_RtmpConnect1(JNIEnv *env, jclass clazz) {
+
+    pthread_mutex_init(&mutex, nullptr);
+    //init rtmp
+    rtmp1 = RTMP_Alloc();
+    RTMP_Init(rtmp1);
+    rtmp1->Link.timeout = 5;
+    if (!RTMP_SetupURL(rtmp1, "rtmp://192.168.88.27/live/test")) {
+        RTMP_Log(RTMP_LOGERROR, "SetupURL err\n");
+        RTMP_Free(rtmp1);
+        return;
+    }
+
+    //if unable,the AMF command would be 'play' instead of 'publish'
+    RTMP_EnableWrite(rtmp1);
+
+    if (!RTMP_Connect(rtmp1, nullptr)) {
+//        RTMP_Log(RTMP_LOGERROR, "rtmp connect err\n");
+        LOGE("rtmp connect err\n");
+        RTMP_Close(rtmp1);
+        RTMP_Free(rtmp1);
+        return;
+    }
+
+    if (!RTMP_ConnectStream(rtmp1, 0)) {
+        LOGE("ConnectStream Err\n");
+//        RTMP_Log(RTMP_LOGERROR, "ConnectStream Err\n");
+        RTMP_Close(rtmp1);
+        RTMP_Free(rtmp1);
+        return;
+    }
+    isConnect = true;
+    start_time = RTMP_GetTime();
+
+    LOGE("isConnect：success");
+    pthread_create(&push_thr, nullptr, onPush, nullptr);
+}
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -92,7 +181,7 @@ Java_com_example_rtmp_1media_RtmpNative_RtmpConnect(JNIEnv *env, jclass clazz, j
     rtmp = RTMP_Alloc();
     RTMP_Init(rtmp);
     rtmp->Link.timeout = 5;
-    if (!RTMP_SetupURL(rtmp, "rtmp://192.168.88.141/live/test")) {
+    if (!RTMP_SetupURL(rtmp, "rtmp://192.168.88.27/live/test")) {
         RTMP_Log(RTMP_LOGERROR, "SetupURL err\n");
         RTMP_Free(rtmp);
         return;
@@ -209,4 +298,60 @@ Java_com_example_rtmp_1media_RtmpNative_RtmpConnect(JNIEnv *env, jclass clazz, j
     }
 
     env->ReleaseStringUTFChars(path, _path);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_rtmp_1media_RtmpNative_pushVideo(JNIEnv *env, jclass clazz, jbyteArray data,
+                                                  jint type, jint timestamp) {
+    if (!isConnect) {
+        return;
+    }
+    jbyte *video = env->GetByteArrayElements(data, JNI_FALSE);
+    int len = env->GetArrayLength(data);
+
+    RTMPPacket *packet = nullptr;
+    packet = static_cast<RTMPPacket *>(malloc(sizeof(RTMPPacket)));
+    RTMPPacket_Alloc(packet, len);
+    RTMPPacket_Reset(packet);
+    //视频
+    packet->m_nChannel = 0x4;
+    memcpy(packet->m_body, video, len);
+
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
+    packet->m_hasAbsTimestamp = FALSE;
+    packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+    packet->m_nBodySize = len;
+
+    packets.push(packet);
+
+    env->ReleaseByteArrayElements(data,video,JNI_FALSE);
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_rtmp_1media_RtmpNative_pushAudio(JNIEnv *env, jclass clazz, jbyteArray data,
+                                                  jint type, jint timestamp) {
+
+    if (!isConnect) {
+        return;
+    }
+    jbyte *audio = env->GetByteArrayElements(data, JNI_FALSE);
+    int len = env->GetArrayLength(data);
+
+    RTMPPacket *packet = nullptr;
+    packet = static_cast<RTMPPacket *>(malloc(sizeof(RTMPPacket)));
+    RTMPPacket_Alloc(packet, len);
+    RTMPPacket_Reset(packet);
+    //音频
+    packet->m_nChannel = 0x5;
+    memcpy(packet->m_body, audio, len);
+
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
+    packet->m_hasAbsTimestamp = FALSE;
+    packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
+    packet->m_nBodySize = len;
+
+    packets.push(packet);
+    env->ReleaseByteArrayElements(data,audio,JNI_FALSE);
+
 }
