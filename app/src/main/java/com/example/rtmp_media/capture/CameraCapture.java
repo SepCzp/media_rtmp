@@ -188,8 +188,12 @@ public class CameraCapture {
             SessionConfiguration configuration = new SessionConfiguration(SESSION_REGULAR, outputConfigurations, executor, cameraCaptureSessionCallback);
             cameraDevice.createCaptureSession(configuration);
         } else {
-            cameraDevice.createCaptureSession(Arrays.asList(in), cameraCaptureSessionCallback, cameraHandler);
+            cameraDevice.createCaptureSession(Arrays.asList(in,out), cameraCaptureSessionCallback, cameraHandler);
         }
+    }
+
+    public Handler getCameraHandler() {
+        return cameraHandler;
     }
 
     public void startCapture(int templateType) {

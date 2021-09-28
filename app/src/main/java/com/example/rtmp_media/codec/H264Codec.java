@@ -119,6 +119,10 @@ public class H264Codec {
         return remaining;
     }
 
+    public byte[] getHead() {
+        return head;
+    }
+
     /**
      * Generates the presentation time for frame N, in microseconds.
      */

@@ -14,6 +14,7 @@ cmake_minimum_required(VERSION 3.4.1)
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 file(GLOB RTMP_SRC rtmp/*.c)
+file(GLOB RTMP_PUSHER pusher/*.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -24,8 +25,9 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        rtmp_media.cpp
+        ${RTMP_PUSHER}
         ${RTMP_SRC}
+        rtmp_media.cpp
         )
 
 # Searches for a specified prebuilt library and stores the path as a

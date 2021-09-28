@@ -24,6 +24,7 @@ import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.ImageWriter;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -86,17 +87,14 @@ public class MainActivity extends AppCompatActivity {
 
     private TextureView textureView;
     private TextureView textureView2;
-    private SurfaceTexture previewSurfaceTexture;
     private Button btnRecord;
 
     private ImageReader imageReader;
-    private HandlerThread handlerThread;
     private H264Codec h264Codec;
     private LinkedBlockingQueue<byte[]> videos = new LinkedBlockingQueue<byte[]>();
-    private Size mSize = new Size(640, 480);
+    private Size mSize = new Size(480, 640);
     private AtomicBoolean isWriteFirst = new AtomicBoolean(false);
 
-    private Executor executor = Executors.newSingleThreadExecutor();
     private CameraCapture cameraCapture;
     private boolean isFront = false;
 
@@ -112,7 +110,47 @@ public class MainActivity extends AppCompatActivity {
         cameraCapture.setCameraListener(new CameraCapture.CameraListener() {
             @Override
             public void open(int w, int h, int sensorOrientation) {
-                configureTransform(textureView.getWidth(),textureView.getHeight());
+                Log.d(TAG, "open: " + w + "   " + h);
+                mSize = new Size(w, h);
+                h264Codec = new H264Codec(640, 480);
+                h264Codec.setEncodeH264Listener(new H264Codec.EncodeH264Listener() {
+                    @Override
+                    public void onData(byte[] data, int type) {
+                        try {
+                            if (type == VideoFrameType.SPS_PPS_I.value) {
+                                byte[] head = h264Codec.getHead();
+                                byte[] sps = new byte[h264Codec.getSpsLen() - 4];
+                                byte[] pps = new byte[head.length - h264Codec.getSpsLen() - 4];
+
+                                System.arraycopy(head, 4, sps, 0, sps.length);
+                                System.arraycopy(head, h264Codec.getSpsLen() + 4, pps, 0, pps.length);
+
+                                byte[] b1 = FlvHelper.warpFLVBodyOfVideoFirstData(1, 7, (byte) 0, sps, pps);
+                                byte[] b2 = FlvHelper.warpFLVBodyOfFixAudioTag(true, 16);
+
+                                RtmpNative.pushVideo(b1, 0, 0);
+                                RtmpNative.pushAudio(b2, 0, 0);
+
+                                byte[] video = FlvHelper.warpFLVBodyOfVideoTag(data, true);
+                                RtmpNative.pushVideo(video, 0, 0);
+                                isWriteFirst.set(true);
+                            } else if (type == VideoFrameType.I.value) {
+                                byte[] bytes = FlvHelper.warpFLVBodyOfVideoTag(data, true);
+                                RtmpNative.pushVideo(bytes, 0, 0);
+                            } else if (type == VideoFrameType.P.value) {
+                                byte[] bytes = FlvHelper.warpFLVBodyOfVideoTag(data, false);
+                                byte[] b = new byte[bytes.length - 4];
+                                System.arraycopy(bytes, 4, b, 0, b.length);
+                                RtmpNative.pushVideo(b, 0, 0);
+                            }
+                            videos.put(data);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+                createImage();
+                configureTransform(textureView.getWidth(), textureView.getHeight());
             }
 
             @Override
@@ -143,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         RtmpNative.RtmpConnect1();
-                        H264DeCodec codec = new H264DeCodec(new Surface(surface), mSize.getWidth(), mSize.getHeight());
+                        H264DeCodec codec = new H264DeCodec(new Surface(surface), 640, 480);
                         while (true) {
                             try {
                                 byte[] take = videos.take();
@@ -172,11 +210,14 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+
         btnRecord = findViewById(R.id.btn_record);
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
+
+                    cameraCapture.startCapture(CameraDevice.TEMPLATE_RECORD);
 
                     AACEncode aacEncode = new AACEncode();
                     aacEncode.setMediaCodecListener(new AACEncode.MediaCodecListener() {
@@ -185,7 +226,7 @@ public class MainActivity extends AppCompatActivity {
                             ByteBuffer buffer = ByteBuffer.allocate(data.length + 2);
                             buffer.put(FlvHelper.warpFLVBodyOfFixAudioTag(false, 16));
                             buffer.put(data);
-                            RtmpNative.pushAudio(buffer.array(), 0, 0);
+//                            RtmpNative.pushAudio(buffer.array(), 0, 0);
                         }
                     });
 
@@ -208,6 +249,46 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void createImage() {
+        HandlerThread     backgroundThread = new HandlerThread("CameraCapture");
+        backgroundThread.start();
+        Handler   cameraHandler = new Handler(backgroundThread.getLooper());
+        imageReader = ImageReader.newInstance(480, 640, ImageFormat.YUV_420_888, 2);
+        imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+            @Override
+            public void onImageAvailable(ImageReader reader) {
+                //获取的是yuv_420，默认是n21
+                Image image = reader.acquireNextImage();
+                int imageFormat = image.getFormat();
+
+                Image.Plane yPlane = image.getPlanes()[0];
+                Image.Plane uPlane = image.getPlanes()[1];
+                Image.Plane vPlane = image.getPlanes()[2];
+
+                ByteBuffer yBuffer = yPlane.getBuffer();
+                ByteBuffer uBuffer = uPlane.getBuffer();
+                ByteBuffer vBuffer = vPlane.getBuffer();
+
+                int ySize = yBuffer.remaining();
+                int uSize = uBuffer.remaining() / uPlane.getPixelStride();
+                int vSize = vBuffer.remaining() / uPlane.getPixelStride();
+
+                byte[] videoData = new byte[ySize + uSize + vSize];
+                yBuffer.get(videoData, 0, ySize);
+                uBuffer.get(videoData, ySize, uSize);
+                vBuffer.get(videoData, ySize + uSize, vSize);
+                Log.i(TAG, "onImageAvailable: buffer size " + videoData.length);
+                //进行数据旋转后需要对编解码的width和height进行修改
+//                    byte[] data = YUVUtil.rotateYUVDegree270(videoData, image.getWidth(), image.getHeight());
+//                byte[] data = YUVUtil.rotateNV21(videoData, image.getWidth(), image.getHeight(), 90);
+//                    Log.d(TAG, "onImageAvailable: nv21 buffer size :" + data.length);
+                h264Codec.encode(videoData);
+                image.close();
+            }
+        }, cameraHandler);
+        cameraCapture.setSurfaceOut(imageReader.getSurface());
+    }
+
     private void configureTransform(int viewWidth, int viewHeight) {
 //        //屏幕旋转角度
         int rotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -226,7 +307,7 @@ public class MainActivity extends AppCompatActivity {
             if (isFront) {
                 matrix.postRotate(90 * (rotation - 2), centerX, centerY);//90*(1/3-2)
             } else {
-                matrix.postRotate(360 - 90 * (rotation-2), centerX, centerY);//90*(1/3-2)
+                matrix.postRotate(360 - 90 * (rotation - 2), centerX, centerY);//90*(1/3-2)
             }
         } else if (Surface.ROTATION_180 == rotation) {
             matrix.postRotate(180, centerX, centerY);
@@ -259,7 +340,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
             Log.d(TAG, "onSurfaceTextureAvailable-->width：" + width + ",height：" + height);
-            previewSurfaceTexture = surface;
             cameraCapture.setInSurface(new Surface(surface));
             cameraCapture.setSize(width, height);
             cameraCapture.openCamera();
