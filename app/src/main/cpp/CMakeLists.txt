@@ -18,6 +18,16 @@ file(GLOB RTMP_PUSHER pusher/*.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+# 通过设置编译选项, 设置函数库的搜索路径
+# 此处的 ANDROID_ABI 是在
+# build.gradle android->defaultConfig->externalNativeBuild->cmake
+# 下的 abiFilters 中设置
+
+# 添加库 编码库
+#add_library(x264 SHARED IMPORTED)
+# 导入第三方函数库路径配置---配置库
+#set_target_properties(x264 PROPERTIES IMPORTED_LOCATION ${JNI_LIBS}/${ANDROID_ABI}/libx264.so)
+
 add_library( # Sets the name of the library.
         rtmp_media
 
@@ -49,7 +59,6 @@ find_library( # Sets the name of the path variable.
 
 target_link_libraries( # Specifies the target library.
         rtmp_media
-
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib})

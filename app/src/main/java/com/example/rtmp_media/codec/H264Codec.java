@@ -91,7 +91,7 @@ public class H264Codec {
 //                ByteBuffer ppsB = mediaCodec.getOutputFormat().getByteBuffer("csd-1");
             } else if (bufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME) {
                 //关键帧- 都要加上pps和sps  所以此处得到的是pps+sps+I帧
-                if (videoFrameType.value == VideoFrameType.SPS_PPS.value&&head!=null) {
+                if (videoFrameType.value == VideoFrameType.SPS_PPS.value && head != null) {
                     byte[] keyData = new byte[bufferInfo.size + head.length];
                     System.arraycopy(head, 0, keyData, 0, head.length);
                     System.arraycopy(outBytes, 0, keyData, head.length, outBytes.length);

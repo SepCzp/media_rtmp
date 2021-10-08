@@ -83,7 +83,7 @@ Java_com_example_rtmp_1media_RtmpNative_RtmpConnect1(JNIEnv *env, jclass clazz) 
     jobject obj = env->NewObject(clazz, mId);
     rtmpController = new RtmpController(javVM, env, obj);
     rtmpController->connect(const_cast<char *>(url));
-//    env->DeleteLocalRef(obj);
+    env->DeleteLocalRef(obj);
 }
 
 

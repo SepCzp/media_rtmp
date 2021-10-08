@@ -1,4 +1,4 @@
-package com.example.rtmp_media;
+package com.example.rtmp_media.util;
 
 import android.graphics.ImageFormat;
 import android.graphics.Rect;

@@ -1,62 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    android:orientation="vertical">
 
-    <LinearLayout
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:text="硬编码推流" />
 
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="拉流" />
 
-            <TextureView
-                android:id="@+id/textureView"
-                android:layout_width="640dp"
-                android:layout_height="480dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerInParent="true"
-                android:text="采集"
-                android:textColor="@android:color/holo_red_dark"
-                android:textSize="18dp" />
-
-        </RelativeLayout>
-
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <TextureView
-                android:id="@+id/textureView2"
-                android:layout_width="640dp"
-                android:layout_height="480dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerInParent="true"
-                android:text="播放"
-                android:textColor="@android:color/holo_red_dark"
-                android:textSize="18dp" />
-
-        </RelativeLayout>
-
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btn_record"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-
-</RelativeLayout>
+</LinearLayout>
